@@ -1,10 +1,17 @@
 import time
 import rtmidi
+import atexit
 # IMPORTANT: the correct library: pip install python-rtmidi
 # there is another library rtmidi-python, which is NOT the one you want
 # you want python-rtmidi!
 print("")
 
+def exit_handler():
+    # for each Player, send a midi note off message for previous and current note
+    midiout.send_message([0x80, player1.last_note, 0])
+    midiout.send_message([0x80, player1.current_note, 0])
+
+atexit.register(exit_handler)
 
 class Sequencer():
     def __init__(self, name, base_sequence, increment=1, tempo_mult=1, block_size=None, block_start=0):
@@ -59,17 +66,26 @@ class Sequencer():
 class Player():
     def __init__(self, name):
         self.name = name
+        self.last_note = "init"
+        self.current_note = "init"
 
     def play(self, sequencer):
 
         if sequencer.play_me == True:
-            prev_note = int(sequencer.prev_out * fund_freq)
-            current_note = int(sequencer.out * fund_freq)
-            midiout.send_message([0x80, prev_note, 0]) # note off message for last note played
-            midiout.send_message([0x90, current_note, 110]) # note on, channel 1, frequency of note, velocity
-            print(self.name, current_note)
-            return current_note
+
+            self.last_note = int(sequencer.prev_out * fund_freq) # should be MIDI value
+            self.current_note = int(sequencer.out * fund_freq) # should be MIDI value
+
+            midiout.send_message([0x80, self.last_note, 0]) # note off message for last note played
+            midiout.send_message([0x90, self.current_note, 110]) # note on, channel 1, frequency of note, velocity
+
+            # TO DO: modify above code to divide amplitude by # of (non-muted/paused) Player objects
+
+            print(self.name, self.current_note)
+            return self.current_note
+
         else:
+
             return None
 
 
