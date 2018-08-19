@@ -8,8 +8,9 @@ print("")
 
 def exit_handler():
     # for each Player, send a midi note off message for previous and current note
-    midiout.send_message([0x80, player1.last_note, 0])
-    midiout.send_message([0x80, player1.current_note, 0])
+    for i in range(len(player_list)):
+        midiout.send_message([0x80, player_list[i].last_note, 0])
+        midiout.send_message([0x80, player_list[i].current_note, 0])
 
 atexit.register(exit_handler)
 
@@ -31,13 +32,13 @@ class Sequencer():
         self.last_out = "init"
         self.last_time = 0
         self.play_me = True
-        self.prev_out = "init"
 
     def block(self):
         return self.base_sequence[self.block_start:(self.block_start + self.block_size)]
 
     def update(self):
 
+        self.last_out = self.out
         block = self.block()
 
         cycles_per_step = float(cycles_per_beat) / self.tempo_mult
@@ -50,16 +51,9 @@ class Sequencer():
             print(self.name, self.out)
             # print 1000 * (0.5 - (time.time() - self.last_time))
             # self.last_time = time.time()
-            if self.prev_out != "init":
-                self.prev_out = self.last_out
             self.play_me = True
         else:
             self.play_me = False
-
-        if self.prev_out == "init":
-                self.prev_out = self.out
-
-        self.last_out = self.out
 
         return self.out
 
@@ -73,7 +67,7 @@ class Player():
 
         if sequencer.play_me == True:
 
-            self.last_note = int(sequencer.prev_out * fund_freq) # should be MIDI value
+            self.last_note = int(sequencer.last_out * fund_freq) # should be MIDI value
             self.current_note = int(sequencer.out * fund_freq) # should be MIDI value
 
             midiout.send_message([0x80, self.last_note, 0]) # note off message for last note played
@@ -91,7 +85,7 @@ class Player():
 
 midiout = rtmidi.MidiOut()
 midiout.open_port(0)
-time.sleep(10) # gives you time to connect midi outputs in patchage
+time.sleep(5) # gives you time to connect midi outputs in patchage
 
 seconds_per_cycle = .001
 
@@ -103,22 +97,27 @@ fund_freq = 40
 
 note_bank = [1, 1.25, 1.3, 1.5, 2]
 
-seq1 = Sequencer("seq1", [1,1.25,1.5,1.75,2], 1, 1)
-seq2 = Sequencer("seq2", [1,2,3], 1, 1)
+sequencer_list = []
 
-player1 = Player("player1")
+sequencer_list.append(Sequencer("seq0", [1,1.25,1.5,1.75,2], 1, 1))
+sequencer_list.append(Sequencer("seq1", [1,2,3], 1, 1))
+
+player_list = []
+
+player_list.append(Player("player1"))
+
 
 while t < 120 / seconds_per_cycle:
 
     # seq2.tempo_mult = seq1.out
     # seq1.increment = seq2.out
 
-    seq1.tempo_mult = seq2.out
+    sequencer_list[0].tempo_mult = sequencer_list[1].out
 
-    seq1.update()
-    seq2.update()
+    for i in range(len(sequencer_list)):
+        sequencer_list[i].update()
 
-    player1.play(seq1)
+    player_list[0].play(sequencer_list[0])
 
     t = t + 1
     time.sleep(seconds_per_cycle - (time.time() % seconds_per_cycle))
