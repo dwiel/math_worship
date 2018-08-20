@@ -1,9 +1,12 @@
 import time
 import rtmidi
 import atexit
-# IMPORTANT: the correct library: pip install python-rtmidi
+"""
+ IMPORTANT: INSTALL the correct library: pip install python-rtmidi
 # there is another library rtmidi-python, which is NOT the one you want
 # you want python-rtmidi!
+"""
+
 print("")
 
 def exit_handler():
@@ -34,7 +37,8 @@ class Sequencer():
         self.play_me = True
 
     def block(self):
-        return self.base_sequence[self.block_start:(self.block_start + self.block_size)]
+        block_start = min(self.block_start % len(self.base_sequence), (self.block_size + self.block_start) % len(self.base_sequence))
+        return self.base_sequence[block_start:(self.block_start + self.block_size)]
 
     def update(self):
 
@@ -43,20 +47,15 @@ class Sequencer():
         block = self.block()
 
         cycles_per_step = float(cycles_per_beat) / self.tempo_mult
-        self.pos += self.increment / cycles_per_step
+        self.pos += (1 / cycles_per_step)
         self.pos = self.pos % len(block)
         self.out = block[int(self.pos)]
 
         if self.last_out != self.out:
+            self.pos = (self.pos + self.increment) % len(block)
+            self.out = block[int(self.pos)]
 
             print(self.name, self.out)
-            """
-            # print 1000 * (0.5 - (time.time() - self.last_time))
-            # self.last_time = time.time()
-            self.play_me = True
-        else:
-            self.play_me = False
-            """
 
         return self.out
 
@@ -104,41 +103,67 @@ time.sleep(5) # gives you time to connect midi outputs in patchage
 
 seconds_per_cycle = .001
 
+# GLOBAL VARIABLES FOR COMPOSITION
+
 bpm = 120.0
 cycles_per_beat = 1 / (bpm / 60 * seconds_per_cycle)
 t = 0
 
-fund_freq = 40 #this is a MIDI value right now, instead of frequency
+# fund_freq = 100
 global_key = 60 # "C" in MIDI
+global_key_temp = "init"
 global_mode = [0, 2, 4, 7, 9] # "major pentatonic"
-# ^ should information about key and mode be stored in a dict? Ask Zach!
+# ^ should information about key and mode be stored in a dict/tuple/...? Ask Zach!
 
 def degree_to_mode(degree, octave=0, key=global_key, mode=global_mode):
     return global_key + (octave * 12) + global_mode[degree % len(global_mode)]
+
+# INITIALIZE GENERATOR OBJECTS
 
 sequencer_list = [] # initializing the list where all sequencers will be stored
 
 sequencer_list.append(Sequencer("seq0", [1,2,3,4,5], 1, 1))
 sequencer_list.append(Sequencer("seq1", [2,3,4], 1, 0.25))
+sequencer_list.append(Sequencer("seq2", [1,2,1,2,3,4,5], 1, 0.5))
 
 player_list = [] #inistalizes list where all players are stored
 
-player_list.append(Player("player1"))
-player_list.append(Player("player2", -1))
+player_list.append(Player("player1", -1))
+player_list.append(Player("player2", -2))
+player_list.append(Player("player3", 0))
 
+# START PLAYING THE ACTUAL COMPOSITION
 
-while t < 120 / seconds_per_cycle:
-
-    # seq2.tempo_mult = seq1.out
-    # seq1.increment = seq2.out
+while t < 1000 / seconds_per_cycle:
 
     sequencer_list[0].tempo_mult = sequencer_list[1].out
+
+    sequencer_list[1].tempo_mult = sequencer_list[0].out/50
+    sequencer_list[1].increment = sequencer_list[0].out
+
+    sequencer_list[2].tempo_mult = sequencer_list[1].out
+    sequencer_list[2].block_size = sequencer_list[1].out + 1
+    sequencer_list[2].block_start = sequencer_list[1].out - 1
+    sequencer_list[2].increment = sequencer_list[1].out * sequencer_list[0].out
+
+    # FIX THIS lol: global_key = 60 + sequencer_list[1].out
 
     for i in range(len(sequencer_list)):
         sequencer_list[i].update()
 
+    global_key = 60 + int(sequencer_list[1].out)
+
+    if global_key_temp != global_key and global_key_temp != "init":
+        for i in range(len(player_list)):
+            midiout.send_message([0x80, int(player_list[i].last_note), 0]) # send off message to last note played
+            midiout.send_message([0x80, int(player_list[i].current_note), 0]) # send off message to current note playing
+
+    global_key_temp = global_key
+
     player_list[0].play(sequencer_list[0])
     player_list[1].play(sequencer_list[1])
+    player_list[2].play(sequencer_list[2])
+
 
     t = t + 1
     time.sleep(seconds_per_cycle - (time.time() % seconds_per_cycle))
