@@ -22,6 +22,7 @@ class Sequencer():
         self.base_sequence = base_sequence
         self.name = name
         self.pos = 0
+        self.last_pos = 0
         self.increment = increment
         self.tempo_mult = tempo_mult
 
@@ -43,6 +44,7 @@ class Sequencer():
     def update(self):
 
         self.last_out = self.out
+        self.last_pos = self.pos
 
         block = self.block()
 
@@ -95,6 +97,40 @@ class Player():
 
             return None
 
+class Drummer():
+    def __init__(self, name, octave=0):
+        self.name = name
+        self.current_note = "init"
+        self.last_note = "init"
+        self.play_me = True
+        self.init = True
+
+    def play(self, sequencer):
+
+        self.current_note = int(36 + sequencer.out) # should be MIDI value
+        self.last_note = int(36 + sequencer.last_out) # should be MIDI value
+
+        if int(sequencer.pos) == int(sequencer.last_pos):
+            self.play_me = False
+        else:
+            self.play_me  = True
+
+        if self.play_me == True or self.init == True:
+
+            self.init = False
+
+            midiout.send_message([0x80, self.last_note, 0]) # note off message for last note played
+            midiout.send_message([0x90, self.current_note, 110]) # note on, channel 1, frequency of note, velocity
+
+            # TO DO: modify above code to divide amplitude by # of (non-muted/paused) Player objects
+
+            print(self.name, self.current_note)
+            return self.current_note
+
+        else:
+
+            return None
+
 
 midiout = rtmidi.MidiOut()
 midiout.open_port(0)
@@ -122,15 +158,18 @@ def degree_to_mode(degree, octave=0, key=global_key, mode=global_mode):
 
 sequencer_list = [] # initializing the list where all sequencers will be stored
 
-sequencer_list.append(Sequencer("seq0", [1,2,3,4,5], 1, 1))
-sequencer_list.append(Sequencer("seq1", [2,3,4], 1, 0.25))
-sequencer_list.append(Sequencer("seq2", [1,2,1,2,3,4,5], 1, 0.5))
+sequencer_list.append(Sequencer("synth0", [1,2,3,4,5], 1, 1))
+sequencer_list.append(Sequencer("synth1", [2,3,4], 1, 0.25))
+sequencer_list.append(Sequencer("synth2", [1,2,1,2,3,4,5], 1, 0.5))
+sequencer_list.append(Sequencer("drum0", [0, 0], 1, 1))
 
 player_list = [] #inistalizes list where all players are stored
 
 player_list.append(Player("player1", -1))
 player_list.append(Player("player2", -2))
 player_list.append(Player("player3", 0))
+
+drummer0 = Drummer("drum0_player")
 
 # START PLAYING THE ACTUAL COMPOSITION
 
@@ -163,6 +202,8 @@ while t < 1000 / seconds_per_cycle:
     player_list[0].play(sequencer_list[0])
     player_list[1].play(sequencer_list[1])
     player_list[2].play(sequencer_list[2])
+
+    drummer0.play(sequencer_list[3])
 
 
     t = t + 1

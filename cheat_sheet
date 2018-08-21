@@ -1,0 +1,5 @@
+class Sequencer():
+    def __init__(self, name, base_sequence, increment=1, tempo_mult=1, block_size=None, block_start=0):
+
+    class Player():
+        def __init__(self, name, octave=0):
