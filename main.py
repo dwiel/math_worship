@@ -1,6 +1,7 @@
 import time
 import rtmidi
 import atexit
+import numbers
 """
  IMPORTANT: INSTALL the correct library: pip install python-rtmidi
 # there is another library rtmidi-python, which is NOT the one you want
@@ -12,8 +13,10 @@ print("")
 def exit_handler():
     # for each Player, send a midi note off message for previous and current note
     for i in range(len(player_list)):
-        midiout.send_message([0x80, player_list[i].last_note, 0])
-        midiout.send_message([0x80, player_list[i].current_note, 0])
+        if isinstance(player_list[i].last_note, numbers.Number):
+            midiout.send_message([0x80, player_list[i].last_note, 0])
+        if isinstance(player_list[i].current_note, numbers.Number):
+            midiout.send_message([0x80, player_list[i].current_note, 0])
 
 atexit.register(exit_handler)
 
@@ -36,6 +39,7 @@ class Sequencer():
         self.last_out = "init"
         self.last_time = 0
         self.play_me = True
+        print(base_sequence)
 
     def block(self):
         block_start = min(self.block_start % len(self.base_sequence), (self.block_size + self.block_start) % len(self.base_sequence))
@@ -54,14 +58,68 @@ class Sequencer():
         self.out = block[int(self.pos)]
 
         if self.last_out != self.out:
-            self.pos = (self.pos + self.increment) % len(block)
+            self.pos = (self.pos + self.increment - 1) % len(block)
             self.out = block[int(self.pos)]
 
             print(self.name, self.out)
 
         return self.out
 
+class Player():
+    def __init__(self, name, octave=0, channel=1):
+        self.name = name
+        self.octave = octave # This doesn't do anything yet.
+        self.channel = channel # This doesn't do anyting yet.
+        self.current_note = "init"
+        self.last_note = "init"
+        self.play_me = True
+        self.init = True
 
+    def play(self, sequencer):
+
+        print(sequencer.pos)
+        print(sequencer.out)
+
+        if isinstance(sequencer.out, numbers.Number):
+            self.current_note = int(degree_to_mode(sequencer.out, self.octave)) # should be MIDI value
+        else:
+            self.current_note = sequencer.out
+
+        if isinstance(sequencer.last_out, numbers.Number):
+            self.last_note = int(degree_to_mode(sequencer.last_out, self.octave)) # should be MIDI value
+        else:
+            self.last_note = sequencer.last_out
+
+        if int(sequencer.pos) == int(sequencer.last_pos):
+            self.play_me = False
+        else:
+            self.play_me  = True
+
+        if self.play_me == True or self.init == True:
+
+            self.init = False
+
+            if self.current_note == 'x':
+                if self.last_note != 'x':
+                    midiout.send_message([0x80, self.last_note, 0]) # note off message for last note played
+            else:
+                if self.last_note != 'x':
+                    midiout.send_message([0x80, self.last_note, 0]) # note off message for last note played
+                    midiout.send_message([0x90, self.current_note, 110]) # note on message for last note played
+                else:
+                    midiout.send_message([0x90, self.current_note, 110]) # note on message for last note played
+
+
+            # TO DO: modify above code to divide amplitude by # of (non-muted/paused) Player objects
+
+            print(self.name, self.current_note)
+            return self.current_note
+
+        else:
+
+            return None
+
+"""
 class Player():
     def __init__(self, name, octave=0):
         self.name = name
@@ -97,9 +155,13 @@ class Player():
 
             return None
 
+"""
+
 class Drummer():
-    def __init__(self, name, octave=0):
+    def __init__(self, name, octave=0, channel=1):
         self.name = name
+        self.octave = octave # This doesn't do anything yet.
+        self.channel = channel # This doesn't do anyting yet.
         self.current_note = "init"
         self.last_note = "init"
         self.play_me = True
@@ -107,8 +169,18 @@ class Drummer():
 
     def play(self, sequencer):
 
-        self.current_note = int(36 + sequencer.out) # should be MIDI value
-        self.last_note = int(36 + sequencer.last_out) # should be MIDI value
+        print(sequencer.pos)
+        print(sequencer.out)
+
+        if isinstance(sequencer.out, numbers.Number):
+            self.current_note = int(36 + sequencer.out) # should be MIDI value
+        else:
+            self.current_note = sequencer.out
+
+        if isinstance(sequencer.last_out, numbers.Number):
+            self.last_note = int(36 + sequencer.last_out) # should be MIDI value
+        else:
+            self.last_note = sequencer.last_out
 
         if int(sequencer.pos) == int(sequencer.last_pos):
             self.play_me = False
@@ -119,8 +191,16 @@ class Drummer():
 
             self.init = False
 
-            midiout.send_message([0x80, self.last_note, 0]) # note off message for last note played
-            midiout.send_message([0x90, self.current_note, 110]) # note on, channel 1, frequency of note, velocity
+            if self.current_note == 'x':
+                if self.last_note != 'x':
+                    midiout.send_message([0x81, self.last_note, 0]) # note off message for last note played
+            else:
+                if self.last_note != 'x':
+                    midiout.send_message([0x81, self.last_note, 0]) # note off message for last note played
+                    midiout.send_message([0x91, self.current_note, 110]) # note on message for last note played
+                else:
+                    midiout.send_message([0x91, self.current_note, 110]) # note on message for last note played
+
 
             # TO DO: modify above code to divide amplitude by # of (non-muted/paused) Player objects
 
@@ -161,7 +241,7 @@ sequencer_list = [] # initializing the list where all sequencers will be stored
 sequencer_list.append(Sequencer("synth0", [1,2,3,4,5], 1, 1))
 sequencer_list.append(Sequencer("synth1", [2,3,4], 1, 0.25))
 sequencer_list.append(Sequencer("synth2", [1,2,1,2,3,4,5], 1, 0.5))
-sequencer_list.append(Sequencer("drum0", [0, 0], 1, 1))
+sequencer_list.append(Sequencer("drum0", [0,6,0,0,3,0,6,6], 1, 4)) # Would be nice to enter a string and have it convert to a list.
 
 player_list = [] #inistalizes list where all players are stored
 
@@ -175,6 +255,8 @@ drummer0 = Drummer("drum0_player")
 
 while t < 1000 / seconds_per_cycle:
 
+    # We need a "map" function that maps inputs to ouputs iff they are numeric
+
     sequencer_list[0].tempo_mult = sequencer_list[1].out
 
     sequencer_list[1].tempo_mult = sequencer_list[0].out/50
@@ -184,6 +266,9 @@ while t < 1000 / seconds_per_cycle:
     sequencer_list[2].block_size = sequencer_list[1].out + 1
     sequencer_list[2].block_start = sequencer_list[1].out - 1
     sequencer_list[2].increment = sequencer_list[1].out * sequencer_list[0].out
+
+    sequencer_list[3].increment = sequencer_list[0].out
+
 
     # FIX THIS lol: global_key = 60 + sequencer_list[1].out
 
