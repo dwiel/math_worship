@@ -1,15 +1,16 @@
-class Sequencer():
-    def __init__(self, name, base_sequence, increment=1, tempo_mult=1, block_size=None, block_start=0):
-
-    class Player():
-        def __init__(self, name, octave=0):
-
 class Attractor():
-        def __init__(self, name, base_sequence, prob_matrix, tempo_mult=1): #old
+    def __init__(self, name, note_pool, prob_matrix="default", tempo_mult=1, steps_between_recalc="default"):
 
-        def __init__(self, name, note_pool, prob_matrix, tempo_mult=1, steps_between_recalc="default"):
+class Player():
+    def __init__(self, sequencer, name="a player", follow_mode=True, octave=0, channel=1):
 
-MIDI messages use hexadecimal for note on/off.
+
+
+MIDI messages use binary, which you then convert to hexadecimal, for messages.
+The first four binary digits (from left to right) specify the type of message (e.g. note on), and the last four specify the channel
+
+
+EXAMPLES:
 0x90 and 0x80 are note on/off for channel 1, respectively.
 0x91 and 0x91 are note on/off for channel 2, respectively.
 
