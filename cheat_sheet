@@ -4,6 +4,11 @@ class Sequencer():
     class Player():
         def __init__(self, name, octave=0):
 
+class Attractor():
+        def __init__(self, name, base_sequence, prob_matrix, tempo_mult=1): #old
+
+        def __init__(self, name, note_pool, prob_matrix, tempo_mult=1, steps_between_recalc="default"):
+
 MIDI messages use hexadecimal for note on/off.
 0x90 and 0x80 are note on/off for channel 1, respectively.
 0x91 and 0x91 are note on/off for channel 2, respectively.

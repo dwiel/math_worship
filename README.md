@@ -4,6 +4,7 @@ Dependencies:
     apt-get install libjack-dev OR libjack-jackd2-dev
     apt-get install libasound2 libasound2-dev
     pip install python-rtmidi OR pip install --pre python-rtmidi
+    pip install numpy
 
   Applications to plug into:
     JACK (qjackctl)
